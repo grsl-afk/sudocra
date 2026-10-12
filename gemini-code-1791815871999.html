@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>sudoCRA</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --primary: #6c5ce7;
+            --accent: #fd79a8;
+            --text-color: #2d3436;
+            --border-color: #b2bec3;
+            --thick-border: #2d3436;
+            --cell-bg: #ffffff;
+            --cell-readonly: #dfe6e9;
+            --cell-joker: #ffeaa7;
+            --cell-selected: #74b9ff;
+            --cell-error: #ff7675;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-color);
+            padding: 10px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .screen {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hidden { display: none !important; }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+            background: linear-gradient(45deg, #6c5ce7, #fd79a8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        p.subtitle {
+            font-size: 0.9rem;
+            color: #636e72;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(108, 92, 231, 0.4);
+            margin: 8px 0;
+            width: 100%;
+            max-width: 260px;
+            text-align: center;
+            user-select: none;
+        }
+
+        .btn:active { transform: scale(0.97); opacity: 0.9; }
+        .btn-accent { background: var(--accent); box-shadow: 0 4px 10px rgba(253, 121, 168, 0.4); }
+        .btn-secondary { background: #b2bec3; box-shadow: 0 4px 10px rgba(178, 190, 195, 0.4); }
+        .btn:disabled { opacity: 0.55; pointer-events: none; }
+
+        .game-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            font-weight: bold;
+        }
+
+        .sudoku-board {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 3px;
+            background-color: var(--thick-border);
+            border: 3px solid var(--thick-border);
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .sub-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 1px;
+            background-color: var(--thick-border);
+        }
+
+        .cell {
+            background-color: var(--cell-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1.1rem, 4.2vw, 1.55rem);
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        .cell.readonly { background-color: var(--cell-readonly); color: #2d3436; cursor: default; }
+        .cell.joker-cell { background-color: var(--cell-joker); color: #d35400; cursor: default; }
+        .cell.selected { background-color: var(--cell-selected) !important; }
+        .cell.error { background-color: var(--cell-error) !important; color: white; }
+
+        .notes-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0; left: 0;
+            padding: 2px;
+            pointer-events: none;
+        }
+
+        .note-item {
+            font-size: clamp(0.45rem, 1.4vw, 0.7rem);
+            color: #636e72;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .tools-bar { display: flex; gap: 10px; width: 100%; margin-bottom: 10px; }
+
+        .tool-btn {
+            flex: 1;
+            background: white;
+            border: 2px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+
+        .tool-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .num-btn {
+            background: white;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            font-size: 1.25rem;
+            font-weight: bold;
+            padding: 12px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .num-btn:active { background: var(--primary); color: white; }
+
+        .action-bar { display: flex; gap: 10px; width: 100%; }
+        .action-bar .btn { margin: 0; flex: 1; font-size: 0.95rem; padding: 12px; }
+
+        #loading {
+            margin-top: 18px;
+            font-size: 1rem;
+            color: #636e72;
+            display: none;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="home-screen" class="screen">
+            <h1>sudoCRA</h1>
+            <p class="subtitle">Choisissez votre niveau de défi</p>
+            
+            <button class="btn" id="btn-easy">Facile</button>
+            <button class="btn btn-accent" id="btn-medium">Moyen</button>
+            <button class="btn" id="btn-hard" style="background:#d63031;">Difficile</button>
+            
+            <div id="loading">Génération en cours...</div>
+        </div>
+
+        <div id="game-screen" class="screen hidden">
+            <div class="game-header">
+                <span id="level-display">Niveau: Moyen</span>
+                <span id="timer">⏱️ 00:00</span>
+            </div>
+
+            <div class="sudoku-board" id="board"></div>
+
+            <div class="tools-bar">
+                <button id="note-mode-btn" class="tool-btn">✏️ Mode Notes : OFF</button>
+            </div>
+
+            <div class="number-pad">
+                <button class="num-btn" data-num="1">1</button>
+                <button class="num-btn" data-num="2">2</button>
+                <button class="num-btn" data-num="3">3</button>
+                <button class="num-btn" data-num="4">4</button>
+                <button class="num-btn" data-num="5">5</button>
+                <button class="num-btn" data-num="6">6</button>
+                <button class="num-btn" data-num="7">7</button>
+                <button class="num-btn" data-num="8">8</button>
+                <button class="num-btn" data-num="9">9</button>
+                <button class="num-btn" data-num="0" style="color:#d63031;border-color:#d63031;">⌫</button>
+            </div>
+
+            <div class="action-bar">
+                <button class="btn btn-accent" id="btn-joker">💡 Joker</button>
+                <button class="btn btn-secondary" id="btn-menu">Menu</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ========== VARIABLES ==========
+let boardData = [];
+let solutionData = [];
+let initialData = [];
+let jokerCells = [];
+let notesData = [];
+let selectedCell = null;
+let isNoteMode = false;
+let timerInterval = null;
+let secondsElapsed = 0;
+
+// ========== INIT ==========
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('btn-easy').addEventListener('click', () => startGame('easy'));
+    document.getElementById('btn-medium').addEventListener('click', () => startGame('medium'));
+    document.getElementById('btn-hard').addEventListener('click', () => startGame('hard'));
+    document.getElementById('note-mode-btn').addEventListener('click', toggleNoteMode);
+    document.getElementById('btn-joker').addEventListener('click', useJoker);
+    document.getElementById('btn-menu').addEventListener('click', backToMenu);
+
+    document.querySelectorAll('.num-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            inputNumber(parseInt(this.dataset.num));
+        });
+    });
+});
+
+// ========== LANCEMENT ==========
+function startGame(difficulty) {
+    const loading = document.getElementById('loading');
+    loading.style.display = 'block';
+    document.querySelectorAll('#home-screen .btn').forEach(b => b.disabled = true);
+
+    setTimeout(function () {
+        try {
+            generatePuzzle(difficulty);
+
+            document.getElementById('level-display').textContent = 'Niveau: ' + difficulty.toUpperCase();
+            isNoteMode = false;
+            updateNoteModeUI();
+
+            document.getElementById('home-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            startTimer(0);
+            renderBoard();
+        } catch (e) {
+            alert('Erreur : ' + e.message);
+            console.error(e);
+        } finally {
+            loading.style.display = 'none';
+            document.querySelectorAll('#home-screen .btn').forEach(b => b.disabled = false);
+        }
+    }, 30);
+}
+
+function backToMenu() {
+    clearInterval(timerInterval);
+    document.getElementById('game-screen').classList.add('hidden');
+    document.getElementById('home-screen').classList.remove('hidden');
+}
+
+function toggleNoteMode() {
+    isNoteMode = !isNoteMode;
+    updateNoteModeUI();
+}
+
+function updateNoteModeUI() {
+    const btn = document.getElementById('note-mode-btn');
+    if (isNoteMode) {
+        btn.classList.add('active');
+        btn.textContent = '✏️ Mode Notes : ON';
+    } else {
+        btn.classList.remove('active');
+        btn.textContent = '✏️ Mode Notes : OFF';
+    }
+}
+
+// ========== GÉNÉRATEUR DE GRILLES ==========
+function generatePuzzle(difficulty) {
+    const base = [
+        [1,2,3,4,5,6,7,8,9],
+        [4,5,6,7,8,9,1,2,3],
+        [7,8,9,1,2,3,4,5,6],
+        [2,3,4,5,6,7,8,9,1],
+        [5,6,7,8,9,1,2,3,4],
+        [8,9,1,2,3,4,5,6,7],
+        [3,4,5,6,7,8,9,1,2],
+        [6,7,8,9,1,2,3,4,5],
+        [9,1,2,3,4,5,6,7,8]
+    ];
+
+    let grid = base.map(row => row.slice());
+
+    const nums = [1,2,3,4,5,6,7,8,9];
+    shuffle(nums);
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            grid[r][c] = nums[grid[r][c] - 1];
+        }
+    }
+
+    shuffleBands(grid, true);
+    shuffleBands(grid, false);
+
+    for (let band = 0; band < 3; band++) {
+        const rows = [0,1,2].map(i => band * 3 + i);
+        shuffle(rows);
+        const temp = rows.map(r => grid[r].slice());
+        for (let i = 0; i < 3; i++) {
+            grid[band * 3 + i] = temp[i];
+        }
+    }
+
+    for (let band = 0; band < 3; band++) {
+        const cols = [0,1,2].map(i => band * 3 + i);
+        shuffle(cols);
+        for (let r = 0; r < 9; r++) {
+            const temp = cols.map(c => grid[r][c]);
+            for (let i = 0; i < 3; i++) {
+                grid[r][band * 3 + i] = temp[i];
+            }
+        }
+    }
+
+    solutionData = grid.map(row => row.slice());
+
+    const removeCount = difficulty === 'easy' ? 36 : (difficulty === 'medium' ? 46 : 54);
+    let puzzle = grid.map(row => row.slice());
+
+    const positions = [];
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            positions.push([r, c]);
+        }
+    }
+    shuffle(positions);
+
+    for (let i = 0; i < removeCount; i++) {
+        const [r, c] = positions[i];
+        puzzle[r][c] = 0;
+    }
+
+    boardData = puzzle.map(row => row.slice());
+    initialData = puzzle.map(row => row.slice());
+    jokerCells = [];
+    notesData = Array.from({length: 9}, () => Array.from({length: 9}, () => new Set()));
+    selectedCell = null;
+}
+
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+}
+
+function shuffleBands(grid, isRow) {
+    const bands = [0, 1, 2];
+    shuffle(bands);
+    if (isRow) {
+        const newGrid = [];
+        for (const b of bands) {
+            newGrid.push(grid[b*3], grid[b*3+1], grid[b*3+2]);
+        }
+        for (let i = 0; i < 9; i++) grid[i] = newGrid[i];
+    } else {
+        const temp = Array.from({length: 9}, () => Array(9));
+        for (let r = 0; r < 9; r++) {
+            for (let b = 0; b < 3; b++) {
+                for (let i = 0; i < 3; i++) {
+                    temp[r][b*3 + i] = grid[r][bands[b]*3 + i];
+                }
+            }
+        }
+        for (let r = 0; r < 9; r++) {
+            for (let c = 0; c < 9; c++) {
+                grid[r][c] = temp[r][c];
+            }
+        }
+    }
+}
+
+// ========== AFFICHAGE ET INTERACTION ==========
+function renderBoard() {
+    const boardEl = document.getElementById('board');
+    boardEl.innerHTML = '';
+
+    for (let bRow = 0; bRow < 3; bRow++) {
+        for (let bCol = 0; bCol < 3; bCol++) {
+            const subGrid = document.createElement('div');
+            subGrid.className = 'sub-grid';
+
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const row = bRow * 3 + r;
+                    const col = bCol * 3 + c;
+
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+
+                    const val = boardData[row][col];
+                    if (val !== 0) {
+                        cell.textContent = val;
+                        if (initialData[row][col] !== 0) {
+                            cell.classList.add('readonly');
+                        } else if (jokerCells.some(j => j.row === row && j.col === col)) {
+                            cell.classList.add('joker-cell');
+                        }
+                    } else {
+                        const notesSet = notesData[row][col];
+                        if (notesSet.size > 0) {
+                            const notesContainer = document.createElement('div');
+                            notesContainer.className = 'notes-grid';
+                            for (let n = 1; n <= 9; n++) {
+                                const noteItem = document.createElement('div');
+                                noteItem.className = 'note-item';
+                                if (notesSet.has(n)) noteItem.textContent = n;
+                                notesContainer.appendChild(noteItem);
+                            }
+                            cell.appendChild(notesContainer);
+                        }
+                    }
+
+                    cell.addEventListener('click', () => selectCell(row, col));
+                    subGrid.appendChild(cell);
+                }
+            }
+            boardEl.appendChild(subGrid);
+        }
+    }
+}
+
+function selectCell(row, col) {
+    if (initialData[row][col] !== 0) return;
+    if (jokerCells.some(j => j.row === row && j.col === col)) return;
+
+    selectedCell = { row, col };
+
+    document.querySelectorAll('.cell').forEach(c => {
+        c.classList.remove('selected');
+        if (parseInt(c.dataset.row) === row && parseInt(c.dataset.col) === col) {
+            c.classList.add('selected');
+        }
+    });
+}
+
+function inputNumber(num) {
+    if (!selectedCell) return;
+    const { row, col } = selectedCell;
+
+    if (num === 0) {
+        boardData[row][col] = 0;
+        notesData[row][col].clear();
+    } else if (isNoteMode) {
+        if (boardData[row][col] === 0) {
+            if (notesData[row][col].has(num)) {
+                notesData[row][col].delete(num);
+            } else {
+                notesData[row][col].add(num);
+            }
+        }
+    } else {
+        boardData[row][col] = num;
+        notesData[row][col].clear();
+    }
+
+    renderBoard();
+    selectCell(row, col);
+    if (num !== 0 && !isNoteMode) checkWin();
+}
+
+function useJoker() {
+    const emptyCells = [];
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if ((boardData[r][c] === 0 || boardData[r][c] !== solutionData[r][c]) &&
+                initialData[r][c] === 0 &&
+                !jokerCells.some(j => j.row === r && j.col === c)) {
+                emptyCells.push({ r, c });
+            }
+        }
+    }
+
+    if (emptyCells.length > 0) {
+        const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        boardData[randomCell.r][randomCell.c] = solutionData[randomCell.r][randomCell.c];
+        notesData[randomCell.r][randomCell.c].clear();
+        jokerCells.push({ row: randomCell.r, col: randomCell.c });
+        selectedCell = null;
+        renderBoard();
+        checkWin();
+    }
+}
+
+function checkWin() {
+    let isComplete = true;
+    let hasErrors = false;
+
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (boardData[r][c] === 0) isComplete = false;
+            else if (boardData[r][c] !== solutionData[r][c]) hasErrors = true;
+        }
+    }
+
+    if (isComplete) {
+        clearInterval(timerInterval);
+        if (!hasErrors) {
+            alert('🎉 Bravo ! Vous avez gagné en ' + formatTime(secondsElapsed) + ' !');
+            backToMenu();
+        } else {
+            document.querySelectorAll('.cell').forEach(cell => {
+                const r = parseInt(cell.dataset.row);
+                const c = parseInt(cell.dataset.col);
+                if (boardData[r][c] !== 0 && boardData[r][c] !== solutionData[r][c]) {
+                    cell.classList.add('error');
+                }
+            });
+            alert('❌ Il y a des erreurs dans la grille.');
+        }
+    }
+}
+
+function startTimer(start) {
+    secondsElapsed = start;
+    clearInterval(timerInterval);
+    document.getElementById('timer').textContent = '⏱️ ' + formatTime(secondsElapsed);
+
+    timerInterval = setInterval(function () {
+        secondsElapsed++;
+        document.getElementById('timer').textContent = '⏱️ ' + formatTime(secondsElapsed);
+    }, 1000);
+}
+
+function formatTime(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+}
+</script>
+</body>
+</html>
