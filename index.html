@@ -225,6 +225,7 @@
             <h1>sudoCRA</h1>
             <p class="subtitle">Choisissez votre niveau de défi</p>
             
+            <button class="btn btn-accent hidden" id="btn-resume">📂 Reprendre la partie</button>
             <button class="btn" id="btn-easy">Facile</button>
             <button class="btn btn-accent" id="btn-medium">Moyen</button>
             <button class="btn" id="btn-hard" style="background:#d63031;">Difficile</button>
@@ -266,6 +267,7 @@
 
 <script>
 // ========== VARIABLES ==========
+let currentDifficulty = 'medium';
 let boardData = [];
 let solutionData = [];
 let initialData = [];
@@ -278,9 +280,10 @@ let secondsElapsed = 0;
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('btn-easy').addEventListener('click', () => startGame('easy'));
-    document.getElementById('btn-medium').addEventListener('click', () => startGame('medium'));
-    document.getElementById('btn-hard').addEventListener('click', () => startGame('hard'));
+    document.getElementById('btn-easy').addEventListener('click', () => startNewGame('easy'));
+    document.getElementById('btn-medium').addEventListener('click', () => startNewGame('medium'));
+    document.getElementById('btn-hard').addEventListener('click', () => startNewGame('hard'));
+    document.getElementById('btn-resume').addEventListener('click', resumeGame);
     document.getElementById('note-mode-btn').addEventListener('click', toggleNoteMode);
     document.getElementById('btn-joker').addEventListener('click', useJoker);
     document.getElementById('btn-menu').addEventListener('click', backToMenu);
@@ -290,16 +293,50 @@ document.addEventListener('DOMContentLoaded', function () {
             inputNumber(parseInt(this.dataset.num));
         });
     });
+
+    checkSavedGame();
 });
 
+// ========== GESTION SAUVEGARDE (LOCALSTORAGE) ==========
+function saveGame() {
+    const gameState = {
+        currentDifficulty,
+        boardData,
+        solutionData,
+        initialData,
+        jokerCells,
+        notesData: notesData.map(row => row.map(cellSet => Array.from(cellSet))),
+        secondsElapsed
+    };
+    localStorage.setItem('sudocra_save', JSON.stringify(gameState));
+    checkSavedGame();
+}
+
+function checkSavedGame() {
+    const saved = localStorage.getItem('sudocra_save');
+    const resumeBtn = document.getElementById('btn-resume');
+    if (saved) {
+        resumeBtn.classList.remove('hidden');
+    } else {
+        resumeBtn.classList.add('hidden');
+    }
+}
+
+function clearSavedGame() {
+    localStorage.removeItem('sudocra_save');
+    checkSavedGame();
+}
+
 // ========== LANCEMENT ==========
-function startGame(difficulty) {
+function startNewGame(difficulty) {
+    clearSavedGame();
     const loading = document.getElementById('loading');
     loading.style.display = 'block';
     document.querySelectorAll('#home-screen .btn').forEach(b => b.disabled = true);
 
     setTimeout(function () {
         try {
+            currentDifficulty = difficulty;
             generatePuzzle(difficulty);
 
             document.getElementById('level-display').textContent = 'Niveau: ' + difficulty.toUpperCase();
@@ -311,6 +348,7 @@ function startGame(difficulty) {
 
             startTimer(0);
             renderBoard();
+            saveGame();
         } catch (e) {
             alert('Erreur : ' + e.message);
             console.error(e);
@@ -321,10 +359,42 @@ function startGame(difficulty) {
     }, 30);
 }
 
+function resumeGame() {
+    const saved = localStorage.getItem('sudocra_save');
+    if (!saved) return;
+
+    try {
+        const gameState = JSON.parse(saved);
+        currentDifficulty = gameState.currentDifficulty;
+        boardData = gameState.boardData;
+        solutionData = gameState.solutionData;
+        initialData = gameState.initialData;
+        jokerCells = gameState.jokerCells;
+        secondsElapsed = gameState.secondsElapsed;
+        
+        notesData = gameState.notesData.map(row => row.map(cellArr => new Set(cellArr)));
+
+        document.getElementById('level-display').textContent = 'Niveau: ' + currentDifficulty.toUpperCase();
+        isNoteMode = false;
+        updateNoteModeUI();
+
+        document.getElementById('home-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+
+        startTimer(secondsElapsed);
+        renderBoard();
+    } catch (e) {
+        alert('Erreur lors de la reprise de la partie.');
+        console.error(e);
+        clearSavedGame();
+    }
+}
+
 function backToMenu() {
     clearInterval(timerInterval);
     document.getElementById('game-screen').classList.add('hidden');
     document.getElementById('home-screen').classList.remove('hidden');
+    checkSavedGame();
 }
 
 function toggleNoteMode() {
@@ -536,6 +606,7 @@ function inputNumber(num) {
 
     renderBoard();
     selectCell(row, col);
+    saveGame();
     if (num !== 0 && !isNoteMode) checkWin();
 }
 
@@ -558,6 +629,7 @@ function useJoker() {
         jokerCells.push({ row: randomCell.r, col: randomCell.c });
         selectedCell = null;
         renderBoard();
+        saveGame();
         checkWin();
     }
 }
@@ -575,6 +647,7 @@ function checkWin() {
 
     if (isComplete) {
         clearInterval(timerInterval);
+        clearSavedGame();
         if (!hasErrors) {
             alert('🎉 Bravo ! Vous avez gagné en ' + formatTime(secondsElapsed) + ' !');
             backToMenu();
@@ -599,6 +672,12 @@ function startTimer(start) {
     timerInterval = setInterval(function () {
         secondsElapsed++;
         document.getElementById('timer').textContent = '⏱️ ' + formatTime(secondsElapsed);
+        const saved = localStorage.getItem('sudocra_save');
+        if (saved) {
+            let gameState = JSON.parse(saved);
+            gameState.secondsElapsed = secondsElapsed;
+            localStorage.setItem('sudocra_save', JSON.stringify(gameState));
+        }
     }, 1000);
 }
 
